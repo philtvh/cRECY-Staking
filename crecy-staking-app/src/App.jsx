@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Wallet, ArrowRightLeft, TrendingUp, AlertCircle, CheckCircle2, Sun, Moon, Globe } from 'lucide-react';
-import { createWeb3Modal, defaultConfig, useWeb3Modal, useWeb3ModalAccount, useWeb3ModalProvider } from '@web3modal/ethers/react';
-import { BrowserProvider, Contract, parseUnits, formatUnits, MaxUint256 } from 'ethers';
+import { Wallet, ArrowRightLeft, TrendingUp, AlertCircle, CheckCircle2, Sun, Moon, Globe } from 'https://esm.sh/lucide-react@0.300.0';
+import { createWeb3Modal, defaultConfig, useWeb3Modal, useWeb3ModalAccount, useWeb3ModalProvider } from 'https://esm.sh/@web3modal/ethers@5.1.11/react?external=react';
+import { BrowserProvider, Contract, parseUnits, formatUnits, MaxUint256 } from 'https://esm.sh/ethers@6.11.1';
 
 // Inject Google Fonts dynamically
 const FontStyles = () => (
@@ -29,7 +29,7 @@ const FontStyles = () => (
 
 const translations = {
   en: {
-    title: "Staking",
+    title: "cRECY Staking",
     subtitle: "22% Max APY • Impact Investment",
     connect: "Connect Wallet",
     connected: "Connected",
@@ -80,7 +80,7 @@ const translations = {
     na: "N/A"
   },
   pt: {
-    title: "Staking",
+    title: "Staking de cRECY",
     subtitle: "Até 22% APY • Investimento de Impacto",
     connect: "Conectar Carteira",
     connected: "Conectado",
@@ -135,9 +135,8 @@ const translations = {
 // ==========================================
 // CONFIGURATION VARIABLES (PASTE YOURS HERE)
 // ==========================================
-const PROJECT_ID = "166bde35e33389c5d9d28d9629c2ee62";
-const STAKING_CONTRACT_ADDRESS = "0xCF1B48e2E7B4588b6673c4aB1855aFE71368e872";
-// Assuming cRECY is at this address based on earlier deploy script.
+const PROJECT_ID = "YOUR_WALLETCONNECT_PROJECT_ID_HERE" || "1234";
+const STAKING_CONTRACT_ADDRESS = "YOUR_DEPLOYED_CONTRACT_ADDRESS_HERE";
 const CRECY_TOKEN_ADDRESS = "0x34C11A932853Ae24E845Ad4B633E3cEf91afE583";
 
 // Celo Network Configuration
@@ -215,8 +214,10 @@ export default function StakingDashboard() {
 
   // User State
   const [walletBalance, setWalletBalance] = useState(0);
+  const [rawWalletBalance, setRawWalletBalance] = useState("");
   const [allowance, setAllowance] = useState(0);
   const [stakedAmount, setStakedAmount] = useState(0);
+  const [rawStakedAmount, setRawStakedAmount] = useState("");
   const [pendingBase, setPendingBase] = useState(0);
   const [pendingMilestone, setPendingMilestone] = useState(0);
   const [lastMilestoneTime, setLastMilestoneTime] = useState(0);
@@ -234,46 +235,54 @@ export default function StakingDashboard() {
     
     try {
       const ethersProvider = new BrowserProvider(walletProvider);
-      
       const tokenContract = new Contract(CRECY_TOKEN_ADDRESS, ERC20_ABI, ethersProvider);
       const stakingContract = new Contract(STAKING_CONTRACT_ADDRESS, STAKING_ABI, ethersProvider);
 
-      // Fetch user specific data
-      const balanceWei = await tokenContract.balanceOf(address);
-      const allowanceWei = await tokenContract.allowance(address, STAKING_CONTRACT_ADDRESS);
-      
-      let stakedWei = 0n;
-      let baseYieldWei = 0n;
-      let milestoneYieldWei = 0n;
-      let stakeTime = 0n;
-      let totalWei = 0n;
-      let maxCapWei = 0n;
+      // We isolate each call in its own try/catch so one failure doesn't break the entire dashboard
+      try {
+        const balanceWei = await tokenContract.balanceOf(address);
+        setWalletBalance(Number(formatUnits(balanceWei, 18)));
+        setRawWalletBalance(formatUnits(balanceWei, 18));
+      } catch (e) { console.warn("Could not fetch wallet balance", e); }
 
       try {
-        // We use try/catch block here in case the contract address is empty or not deployed yet
-        stakedWei = await stakingContract.stakedBalance(address);
-        baseYieldWei = await stakingContract.pendingBaseYield(address);
-        milestoneYieldWei = await stakingContract.pendingMilestoneYield(address);
-        stakeTime = await stakingContract.userStakeTime(address);
-        
-        totalWei = await stakingContract.totalStaked();
-        maxCapWei = await stakingContract.maxCapacity();
-      } catch (err) {
-        console.warn("Could not fetch staking contract data. Is the address correct?", err);
-      }
+        const allowanceWei = await tokenContract.allowance(address, STAKING_CONTRACT_ADDRESS);
+        setAllowance(Number(formatUnits(allowanceWei, 18)));
+      } catch (e) { console.warn("Could not fetch allowance", e); }
 
-      setWalletBalance(Number(formatUnits(balanceWei, 18)));
-      setAllowance(Number(formatUnits(allowanceWei, 18)));
-      setStakedAmount(Number(formatUnits(stakedWei, 18)));
-      setPendingBase(Number(formatUnits(baseYieldWei, 18)));
-      setPendingMilestone(Number(formatUnits(milestoneYieldWei, 18)));
-      setLastMilestoneTime(Number(stakeTime) * 1000);
+      try {
+        const stakedWei = await stakingContract.stakedBalance(address);
+        setStakedAmount(Number(formatUnits(stakedWei, 18)));
+        setRawStakedAmount(formatUnits(stakedWei, 18));
+      } catch (e) { console.warn("Could not fetch stakedBalance", e); }
       
-      if (totalWei > 0n) setTotalStaked(Number(formatUnits(totalWei, 18)));
-      if (maxCapWei > 0n) setMaxCapacity(Number(formatUnits(maxCapWei, 18)));
+      try {
+        const baseYieldWei = await stakingContract.pendingBaseYield(address);
+        setPendingBase(Number(formatUnits(baseYieldWei, 18)));
+      } catch (e) {}
+      
+      try {
+        const milestoneYieldWei = await stakingContract.pendingMilestoneYield(address);
+        setPendingMilestone(Number(formatUnits(milestoneYieldWei, 18)));
+      } catch (e) {}
+
+      try {
+        const stakeTime = await stakingContract.userStakeTime(address);
+        setLastMilestoneTime(Number(stakeTime) * 1000);
+      } catch (e) {}
+      
+      try {
+        const totalWei = await stakingContract.totalStaked();
+        setTotalStaked(Number(formatUnits(totalWei, 18)));
+      } catch (e) {}
+
+      try {
+        const maxCapWei = await stakingContract.maxCapacity();
+        setMaxCapacity(Number(formatUnits(maxCapWei, 18)));
+      } catch (e) {}
 
     } catch (error) {
-      console.error("Error fetching blockchain data:", error);
+      console.error("Error connecting to blockchain data:", error);
     }
   };
 
@@ -312,7 +321,11 @@ export default function StakingDashboard() {
       await action(signer);
       
       setTxMessage({ type: 'success', text: successMsg });
-      fetchData(); // Refresh data immediately after success
+      
+      // Fetch immediately, and again after 3 seconds to catch node indexing lag
+      fetchData(); 
+      setTimeout(fetchData, 3000);
+      
     } catch (error) {
       console.error("Transaction failed:", error);
       setTxMessage({ type: 'error', text: error.reason || "Transaction failed." });
@@ -333,7 +346,7 @@ export default function StakingDashboard() {
 
   const handleStake = () => {
     const amount = parseFloat(stakeInput);
-    if (!amount || amount > walletBalance || amount <= 0) {
+    if (!amount || amount <= 0) {
       setTxMessage({ type: 'error', text: t.errInvalid });
       return;
     }
@@ -349,7 +362,7 @@ export default function StakingDashboard() {
 
   const handleUnstake = () => {
     const amount = parseFloat(unstakeInput);
-    if (!amount || amount > stakedAmount || amount <= 0) {
+    if (!amount || amount <= 0) {
       setTxMessage({ type: 'error', text: t.errInvalid });
       return;
     }
@@ -559,7 +572,7 @@ export default function StakingDashboard() {
                 <div className="space-y-3 md:space-y-4 mb-6 md:mb-8">
                   <div className="flex justify-between items-end mb-1 md:mb-2">
                     <label className="text-base md:text-lg font-normal font-title text-neutral-800 dark:text-white">{t.stakeTokens}</label>
-                    <button className="text-xs md:text-sm font-normal text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/40 px-2 py-1 md:px-3 md:py-1 rounded-md transition-colors" onClick={() => setStakeInput(walletBalance.toString())}>{t.max}</button>
+                    <button className="text-xs md:text-sm font-normal text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/40 px-2 py-1 md:px-3 md:py-1 rounded-md transition-colors" onClick={() => setStakeInput(rawWalletBalance)}>{t.max}</button>
                   </div>
                   <div className="relative">
                     <input 
@@ -596,7 +609,7 @@ export default function StakingDashboard() {
                 <div className="space-y-3 md:space-y-4 pt-6 md:pt-8 border-t border-neutral-100 dark:border-neutral-800">
                   <div className="flex justify-between items-end mb-1 md:mb-2">
                     <label className="text-base md:text-lg font-normal font-title text-neutral-800 dark:text-white">{t.unstakeTokens}</label>
-                    <button className="text-xs md:text-sm font-normal text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-neutral-800 px-2 py-1 md:px-3 md:py-1 rounded-md transition-colors" onClick={() => setUnstakeInput(stakedAmount.toString())}>{t.max}</button>
+                    <button className="text-xs md:text-sm font-normal text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white bg-neutral-100 dark:bg-neutral-800 px-2 py-1 md:px-3 md:py-1 rounded-md transition-colors" onClick={() => setUnstakeInput(rawStakedAmount)}>{t.max}</button>
                   </div>
                   <div className="relative">
                     <input 
