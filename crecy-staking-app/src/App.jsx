@@ -187,12 +187,11 @@ const STAKING_ABI = [
   "function claimRewards() external",
   "function registerLpPosition(uint256 tokenId, uint256 feeSplitBps, bool active) external",
   "function collectAndRedirectLpFees(uint256 tokenId, uint256 amountMinimum, uint256 deadline) external",
-  "function stakedBalance(address) view returns (uint256)",
+  "function userStakes(address) view returns (uint256 amount, uint256 lastAccrualTime, uint256 pendingBaseRewards, uint256 lastMilestoneTime)",
   "function totalStaked() view returns (uint256)",
   "function maxCapacity() view returns (uint256)",
   "function pendingBaseYield(address) view returns (uint256)",
-  "function pendingMilestoneYield(address) view returns (uint256)",
-  "function userStakeTime(address) view returns (uint256)"
+  "function pendingMilestoneYield(address) view returns (uint256)"
 ];
 
 export default function StakingDashboard() {
@@ -284,10 +283,21 @@ export default function StakingDashboard() {
         } catch (e) { console.warn("Could not fetch allowance", e); }
 
         try {
-          const stakedWei = await stakingContract.stakedBalance(address);
+          const allowanceWei = await tokenContract.allowance(address, STAKING_CONTRACT_ADDRESS);
+          setAllowance(Number(formatUnits(allowanceWei, 18)));
+        } catch (e) { console.warn("Could not fetch allowance", e); }
+
+        try {
+          const stakeData = await stakingContract.userStakes(address);
+          
+          // stakeData is the struct. We extract the 'amount' from it
+          const stakedWei = stakeData.amount;
           setStakedAmount(Number(formatUnits(stakedWei, 18)));
           setRawStakedAmount(formatUnits(stakedWei, 18));
-        } catch (e) { console.warn("Could not fetch stakedBalance", e); }
+          
+          // We can also extract the lastMilestoneTime from the exact same struct!
+          setLastMilestoneTime(Number(stakeData.lastMilestoneTime) * 1000);
+        } catch (e) { console.warn("Could not fetch userStakes", e); }
         
         try {
           const baseYieldWei = await stakingContract.pendingBaseYield(address);
@@ -297,11 +307,6 @@ export default function StakingDashboard() {
         try {
           const milestoneYieldWei = await stakingContract.pendingMilestoneYield(address);
           setPendingMilestone(Number(formatUnits(milestoneYieldWei, 18)));
-        } catch (e) {}
-
-        try {
-          const stakeTime = await stakingContract.userStakeTime(address);
-          setLastMilestoneTime(Number(stakeTime) * 1000);
         } catch (e) {}
       }
     } catch (error) {
