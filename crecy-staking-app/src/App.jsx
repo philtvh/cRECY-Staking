@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'https://esm.sh/react@18.2.0';
 import { Wallet, ArrowRightLeft, TrendingUp, AlertCircle, CheckCircle2, Sun, Moon, Globe } from 'https://esm.sh/lucide-react@0.300.0';
 import { createWeb3Modal, defaultConfig, useWeb3Modal, useWeb3ModalAccount, useWeb3ModalProvider } from 'https://esm.sh/@web3modal/ethers@5.1.11/react?external=react';
 import { BrowserProvider, Contract, parseUnits, formatUnits, MaxUint256, JsonRpcProvider } from 'https://esm.sh/ethers@6.11.1';
@@ -29,7 +29,7 @@ const FontStyles = () => (
 
 const translations = {
   en: {
-    title: "cRECY Staking",
+    title: "Staking",
     subtitle: "22% Max APY • Impact Investment",
     connect: "Connect Wallet",
     connected: "Connected",
@@ -80,7 +80,7 @@ const translations = {
     na: "N/A"
   },
   pt: {
-    title: "Staking de cRECY",
+    title: "Staking",
     subtitle: "Até 22% APY • Investimento de Impacto",
     connect: "Conectar Carteira",
     connected: "Conectado",
@@ -133,9 +133,11 @@ const translations = {
 };
 
 // ==========================================
-// CONFIGURATION VARIABLES (PASTE YOURS HERE)
+// CONFIGURATION VARIABLES
 // ==========================================
-const PROJECT_ID = "166bde35e33389c5d9d28d9629c2ee62" || "1234";
+const PROJECT_ID = "YOUR_WALLETCONNECT_PROJECT_ID_HERE" || "1234";
+
+// WARNING: Ensure this is your newly deployed Staking Contract Address starting with 0x
 const STAKING_CONTRACT_ADDRESS = "0xCF1B48e2E7B4588b6673c4aB1855aFE71368e872";
 const CRECY_TOKEN_ADDRESS = "0x34C11A932853Ae24E845Ad4B633E3cEf91afE583";
 
@@ -230,48 +232,38 @@ export default function StakingDashboard() {
 
   const MILESTONE_DURATION = 90 * 24 * 60 * 60 * 1000; // 90 days in ms
 
- const fetchData = async () => {
+  const fetchData = async () => {
     try {
       // 1. Fetch Global Public Data (Works for guests without connected wallets)
       const publicProvider = new JsonRpcProvider(celo.rpcUrl);
       const publicStakingContract = new Contract(STAKING_CONTRACT_ADDRESS, STAKING_ABI, publicProvider);
       
-      console.log("Global Fetch - Target Contract:", STAKING_CONTRACT_ADDRESS);
-
       try {
-        console.log("Attempting to fetch totalStaked...");
         const totalWei = await publicStakingContract.totalStaked();
-        console.log("Raw totalWei response:", totalWei.toString());
         setTotalStaked(Number(formatUnits(totalWei, 18)));
       } catch (e) { 
-        console.error("FAILED to fetch totalStaked. Error details:", e); 
+        console.warn("Could not fetch totalStaked", e); 
       }
 
       try {
         const maxCapWei = await publicStakingContract.maxCapacity();
         setMaxCapacity(Number(formatUnits(maxCapWei, 18)));
       } catch (e) { 
-        console.error("FAILED to fetch maxCapacity. Error details:", e); 
+        console.warn("Could not fetch maxCapacity", e); 
       }
+
       try {
-        console.log("Attempting to calculate rewardsPool...");
         const publicTokenContract = new Contract(CRECY_TOKEN_ADDRESS, ERC20_ABI, publicProvider);
-        
-        // 1. Get the total cRECY sitting inside the staking contract
         const contractBalanceWei = await publicTokenContract.balanceOf(STAKING_CONTRACT_ADDRESS);
         const contractBalance = Number(formatUnits(contractBalanceWei, 18));
         
-        // 2. Get the totalStaked amount
         const currentTotalWei = await publicStakingContract.totalStaked();
         const currentTotalStaked = Number(formatUnits(currentTotalWei, 18));
         
-        // 3. The difference is the unallocated rewards pool
         const calculatedPool = Math.max(0, contractBalance - currentTotalStaked);
-        console.log("Calculated Treasury Pool:", calculatedPool);
-        
         setRewardsPool(calculatedPool);
       } catch (e) {
-        console.error("FAILED to calculate rewardsPool. Error details:", e);
+        console.warn("Could not calculate rewardsPool", e);
       }
 
       // 2. Fetch User Specific Data (Requires connected wallet)
@@ -324,7 +316,7 @@ export default function StakingDashboard() {
     return () => clearInterval(interval);
   }, [isConnected, address, walletProvider]);
 
-  // Fallback Simulator if contract isn't connected yet (for demo visuals)
+  // Fallback Simulator for visuals between real-time blockchain updates
   useEffect(() => {
     if (stakedAmount > 0) {
       const interval = setInterval(() => {
