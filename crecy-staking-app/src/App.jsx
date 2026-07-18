@@ -236,15 +236,43 @@ export default function StakingDashboard() {
       const publicProvider = new JsonRpcProvider(celo.rpcUrl);
       const publicStakingContract = new Contract(STAKING_CONTRACT_ADDRESS, STAKING_ABI, publicProvider);
       
+      console.log("Global Fetch - Target Contract:", STAKING_CONTRACT_ADDRESS);
+
       try {
+        console.log("Attempting to fetch totalStaked...");
         const totalWei = await publicStakingContract.totalStaked();
+        console.log("Raw totalWei response:", totalWei.toString());
         setTotalStaked(Number(formatUnits(totalWei, 18)));
-      } catch (e) { console.warn("Could not fetch totalStaked", e); }
+      } catch (e) { 
+        console.error("FAILED to fetch totalStaked. Error details:", e); 
+      }
 
       try {
         const maxCapWei = await publicStakingContract.maxCapacity();
         setMaxCapacity(Number(formatUnits(maxCapWei, 18)));
-      } catch (e) { console.warn("Could not fetch maxCapacity", e); }
+      } catch (e) { 
+        console.error("FAILED to fetch maxCapacity. Error details:", e); 
+      }
+      try {
+        console.log("Attempting to calculate rewardsPool...");
+        const publicTokenContract = new Contract(CRECY_TOKEN_ADDRESS, ERC20_ABI, publicProvider);
+        
+        // 1. Get the total cRECY sitting inside the staking contract
+        const contractBalanceWei = await publicTokenContract.balanceOf(STAKING_CONTRACT_ADDRESS);
+        const contractBalance = Number(formatUnits(contractBalanceWei, 18));
+        
+        // 2. Get the totalStaked amount
+        const currentTotalWei = await publicStakingContract.totalStaked();
+        const currentTotalStaked = Number(formatUnits(currentTotalWei, 18));
+        
+        // 3. The difference is the unallocated rewards pool
+        const calculatedPool = Math.max(0, contractBalance - currentTotalStaked);
+        console.log("Calculated Treasury Pool:", calculatedPool);
+        
+        setRewardsPool(calculatedPool);
+      } catch (e) {
+        console.error("FAILED to calculate rewardsPool. Error details:", e);
+      }
 
       // 2. Fetch User Specific Data (Requires connected wallet)
       if (isConnected && walletProvider) {
