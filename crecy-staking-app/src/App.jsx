@@ -190,7 +190,7 @@ const STAKING_ABI = [
   "function userStakes(address) view returns (uint256 amount, uint256 lastAccrualTime, uint256 pendingBaseRewards, uint256 lastMilestoneTime)",
   "function totalStaked() view returns (uint256)",
   "function maxCapacity() view returns (uint256)",
-  "function pendingBaseYield(address) view returns (uint256)",
+  "function pendingBaseRewards(address) view returns (uint256)",
   "function pendingMilestoneYield(address) view returns (uint256)"
 ];
 
@@ -220,8 +220,10 @@ export default function StakingDashboard() {
   const [stakedAmount, setStakedAmount] = useState(0);
   const [rawStakedAmount, setRawStakedAmount] = useState("");
   const [pendingBase, setPendingBase] = useState(0);
+  const [contractPendingBase, setContractPendingBase] = useState(0);
   const [pendingMilestone, setPendingMilestone] = useState(0);
   const [lastMilestoneTime, setLastMilestoneTime] = useState(0);
+  const [lastAccrualTime, setLastAccrualTime] = useState(0);
 
   // Form State
   const [stakeInput, setStakeInput] = useState("");
@@ -283,31 +285,17 @@ export default function StakingDashboard() {
         } catch (e) { console.warn("Could not fetch allowance", e); }
 
         try {
-          const allowanceWei = await tokenContract.allowance(address, STAKING_CONTRACT_ADDRESS);
-          setAllowance(Number(formatUnits(allowanceWei, 18)));
-        } catch (e) { console.warn("Could not fetch allowance", e); }
-
-        try {
           const stakeData = await stakingContract.userStakes(address);
           
-          // stakeData is the struct. We extract the 'amount' from it
           const stakedWei = stakeData.amount;
           setStakedAmount(Number(formatUnits(stakedWei, 18)));
           setRawStakedAmount(formatUnits(stakedWei, 18));
           
-          // We can also extract the lastMilestoneTime from the exact same struct!
+          // Pull absolute timestamps and saved balances directly from the contract
           setLastMilestoneTime(Number(stakeData.lastMilestoneTime) * 1000);
+          setLastAccrualTime(Number(stakeData.lastAccrualTime) * 1000);
+          setContractPendingBase(Number(formatUnits(stakeData.pendingBaseRewards, 18)));
         } catch (e) { console.warn("Could not fetch userStakes", e); }
-        
-        try {
-          const baseYieldWei = await stakingContract.pendingBaseYield(address);
-          setPendingBase(Number(formatUnits(baseYieldWei, 18)));
-        } catch (e) {}
-        
-        try {
-          const milestoneYieldWei = await stakingContract.pendingMilestoneYield(address);
-          setPendingMilestone(Number(formatUnits(milestoneYieldWei, 18)));
-        } catch (e) {}
       }
     } catch (error) {
       console.error("Error connecting to blockchain data:", error);
@@ -321,22 +309,40 @@ export default function StakingDashboard() {
     return () => clearInterval(interval);
   }, [isConnected, address, walletProvider]);
 
-  // Fallback Simulator for visuals between real-time blockchain updates
+  // Absolute Time-Based Reward Calculator
   useEffect(() => {
-    if (stakedAmount > 0) {
-      const interval = setInterval(() => {
-        const yieldPerSecond = (stakedAmount * 0.15) / 31536000;
-        setPendingBase(prev => prev + yieldPerSecond);
+    if (stakedAmount > 0 && lastAccrualTime > 0) {
+      const updateRewards = () => {
+        const now = Date.now();
         
-        if (lastMilestoneTime > 0 && Date.now() >= lastMilestoneTime + MILESTONE_DURATION) {
-          const milestonesPassed = Math.floor((Date.now() - lastMilestoneTime) / MILESTONE_DURATION);
-          const earnedMilestone = stakedAmount * 0.0175 * milestonesPassed;
-          setPendingMilestone(earnedMilestone);
+        // 1. Calculate Base Yield based on absolute time passed
+        const secondsPassed = (now - lastAccrualTime) / 1000;
+        const yieldPerSecond = (stakedAmount * 0.15) / 31536000; // 15% APY
+        const unrecordedBase = Math.max(0, secondsPassed * yieldPerSecond);
+        
+        setPendingBase(contractPendingBase + unrecordedBase);
+        
+        // 2. Calculate Milestone Yield based on exact timer
+        if (lastMilestoneTime > 0) {
+          const timeSinceMilestone = now - lastMilestoneTime;
+          if (timeSinceMilestone >= MILESTONE_DURATION) {
+            const milestonesPassed = Math.floor(timeSinceMilestone / MILESTONE_DURATION);
+            const earnedMilestone = stakedAmount * 0.0175 * milestonesPassed; // 1.75% chunk
+            setPendingMilestone(earnedMilestone);
+          } else {
+            setPendingMilestone(0);
+          }
         }
-      }, 1000);
+      };
+
+      updateRewards(); // Run immediately on render
+      const interval = setInterval(updateRewards, 1000);
       return () => clearInterval(interval);
+    } else {
+      setPendingBase(0);
+      setPendingMilestone(0);
     }
-  }, [stakedAmount, lastMilestoneTime]);
+  }, [stakedAmount, lastAccrualTime, contractPendingBase, lastMilestoneTime]);
 
   const handleTx = async (action, successMsg) => {
     if (!walletProvider) return;
