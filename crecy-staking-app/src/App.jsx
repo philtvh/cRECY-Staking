@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'https://esm.sh/react@18.2.0';
-import { Wallet, ArrowRightLeft, TrendingUp, AlertCircle, CheckCircle2, Sun, Moon, Globe } from 'https://esm.sh/lucide-react@0.300.0';
-import { createWeb3Modal, defaultConfig, useWeb3Modal, useWeb3ModalAccount, useWeb3ModalProvider } from 'https://esm.sh/@web3modal/ethers@5.1.11/react?external=react';
-import { BrowserProvider, Contract, parseUnits, formatUnits, MaxUint256, JsonRpcProvider } from 'https://esm.sh/ethers@6.11.1';
+import React, { useState, useEffect } from 'react';
+import { Wallet, ArrowRightLeft, TrendingUp, AlertCircle, CheckCircle2, Sun, Moon, Globe } from 'lucide-react';
+import { createWeb3Modal, defaultConfig, useWeb3Modal, useWeb3ModalAccount, useWeb3ModalProvider } from '@web3modal/ethers/react';
+import { BrowserProvider, Contract, parseUnits, formatUnits, MaxUint256, JsonRpcProvider } from 'ethers';
 
 // Inject Google Fonts dynamically
 const FontStyles = () => (
@@ -135,7 +135,7 @@ const translations = {
 // ==========================================
 // CONFIGURATION VARIABLES
 // ==========================================
-const PROJECT_ID = "YOUR_WALLETCONNECT_PROJECT_ID_HERE" || "1234";
+const PROJECT_ID = "166bde35e33389c5d9d28d9629c2ee62" || "1234";
 
 // WARNING: Ensure this is your newly deployed Staking Contract Address starting with 0x
 const STAKING_CONTRACT_ADDRESS = "0xCF1B48e2E7B4588b6673c4aB1855aFE71368e872";
@@ -151,9 +151,9 @@ const celo = {
 };
 
 const metadata = {
-  name: 'cRECY Staking',
+  name: 'Staking',
   description: 'cRECY Impact Investment Staking Dashboard',
-  url: 'https://crecy-staking.com', 
+  url: 'https://staking.recy.life', 
   icons: ['https://avatars.githubusercontent.com/u/37784886']
 };
 
