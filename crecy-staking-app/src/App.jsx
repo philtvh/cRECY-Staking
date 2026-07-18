@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Wallet, ArrowRightLeft, TrendingUp, AlertCircle, CheckCircle2, Sun, Moon, Globe } from 'https://esm.sh/lucide-react@0.300.0';
 import { createWeb3Modal, defaultConfig, useWeb3Modal, useWeb3ModalAccount, useWeb3ModalProvider } from 'https://esm.sh/@web3modal/ethers@5.1.11/react?external=react';
-import { BrowserProvider, Contract, parseUnits, formatUnits, MaxUint256 } from 'https://esm.sh/ethers@6.11.1';
+import { BrowserProvider, Contract, parseUnits, formatUnits, MaxUint256, JsonRpcProvider } from 'https://esm.sh/ethers@6.11.1';
 
 // Inject Google Fonts dynamically
 const FontStyles = () => (
@@ -230,57 +230,60 @@ export default function StakingDashboard() {
 
   const MILESTONE_DURATION = 90 * 24 * 60 * 60 * 1000; // 90 days in ms
 
-  const fetchData = async () => {
-    if (!isConnected || !walletProvider) return;
-    
+ const fetchData = async () => {
     try {
-      const ethersProvider = new BrowserProvider(walletProvider);
-      const tokenContract = new Contract(CRECY_TOKEN_ADDRESS, ERC20_ABI, ethersProvider);
-      const stakingContract = new Contract(STAKING_CONTRACT_ADDRESS, STAKING_ABI, ethersProvider);
-
-      // We isolate each call in its own try/catch so one failure doesn't break the entire dashboard
-      try {
-        const balanceWei = await tokenContract.balanceOf(address);
-        setWalletBalance(Number(formatUnits(balanceWei, 18)));
-        setRawWalletBalance(formatUnits(balanceWei, 18));
-      } catch (e) { console.warn("Could not fetch wallet balance", e); }
-
-      try {
-        const allowanceWei = await tokenContract.allowance(address, STAKING_CONTRACT_ADDRESS);
-        setAllowance(Number(formatUnits(allowanceWei, 18)));
-      } catch (e) { console.warn("Could not fetch allowance", e); }
-
-      try {
-        const stakedWei = await stakingContract.stakedBalance(address);
-        setStakedAmount(Number(formatUnits(stakedWei, 18)));
-        setRawStakedAmount(formatUnits(stakedWei, 18));
-      } catch (e) { console.warn("Could not fetch stakedBalance", e); }
+      // 1. Fetch Global Public Data (Works for guests without connected wallets)
+      const publicProvider = new JsonRpcProvider(celo.rpcUrl);
+      const publicStakingContract = new Contract(STAKING_CONTRACT_ADDRESS, STAKING_ABI, publicProvider);
       
       try {
-        const baseYieldWei = await stakingContract.pendingBaseYield(address);
-        setPendingBase(Number(formatUnits(baseYieldWei, 18)));
-      } catch (e) {}
-      
-      try {
-        const milestoneYieldWei = await stakingContract.pendingMilestoneYield(address);
-        setPendingMilestone(Number(formatUnits(milestoneYieldWei, 18)));
-      } catch (e) {}
-
-      try {
-        const stakeTime = await stakingContract.userStakeTime(address);
-        setLastMilestoneTime(Number(stakeTime) * 1000);
-      } catch (e) {}
-      
-      try {
-        const totalWei = await stakingContract.totalStaked();
+        const totalWei = await publicStakingContract.totalStaked();
         setTotalStaked(Number(formatUnits(totalWei, 18)));
-      } catch (e) {}
+      } catch (e) { console.warn("Could not fetch totalStaked", e); }
 
       try {
-        const maxCapWei = await stakingContract.maxCapacity();
+        const maxCapWei = await publicStakingContract.maxCapacity();
         setMaxCapacity(Number(formatUnits(maxCapWei, 18)));
-      } catch (e) {}
+      } catch (e) { console.warn("Could not fetch maxCapacity", e); }
 
+      // 2. Fetch User Specific Data (Requires connected wallet)
+      if (isConnected && walletProvider) {
+        const ethersProvider = new BrowserProvider(walletProvider);
+        const tokenContract = new Contract(CRECY_TOKEN_ADDRESS, ERC20_ABI, ethersProvider);
+        const stakingContract = new Contract(STAKING_CONTRACT_ADDRESS, STAKING_ABI, ethersProvider);
+
+        try {
+          const balanceWei = await tokenContract.balanceOf(address);
+          setWalletBalance(Number(formatUnits(balanceWei, 18)));
+          setRawWalletBalance(formatUnits(balanceWei, 18));
+        } catch (e) { console.warn("Could not fetch wallet balance", e); }
+
+        try {
+          const allowanceWei = await tokenContract.allowance(address, STAKING_CONTRACT_ADDRESS);
+          setAllowance(Number(formatUnits(allowanceWei, 18)));
+        } catch (e) { console.warn("Could not fetch allowance", e); }
+
+        try {
+          const stakedWei = await stakingContract.stakedBalance(address);
+          setStakedAmount(Number(formatUnits(stakedWei, 18)));
+          setRawStakedAmount(formatUnits(stakedWei, 18));
+        } catch (e) { console.warn("Could not fetch stakedBalance", e); }
+        
+        try {
+          const baseYieldWei = await stakingContract.pendingBaseYield(address);
+          setPendingBase(Number(formatUnits(baseYieldWei, 18)));
+        } catch (e) {}
+        
+        try {
+          const milestoneYieldWei = await stakingContract.pendingMilestoneYield(address);
+          setPendingMilestone(Number(formatUnits(milestoneYieldWei, 18)));
+        } catch (e) {}
+
+        try {
+          const stakeTime = await stakingContract.userStakeTime(address);
+          setLastMilestoneTime(Number(stakeTime) * 1000);
+        } catch (e) {}
+      }
     } catch (error) {
       console.error("Error connecting to blockchain data:", error);
     }
