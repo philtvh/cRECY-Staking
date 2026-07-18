@@ -2,6 +2,7 @@ import "@nomicfoundation/hardhat-toolbox";
 import "dotenv/config";
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY; 
+const API_KEY = process.env.ETHERSCAN_API_KEY || process.env.CELOSCAN_API_KEY;
 
 if (!PRIVATE_KEY) {
   console.warn("⚠️  WARNING: No PRIVATE_KEY found in .env file! Deployment will fail.");
@@ -29,5 +30,13 @@ export default {
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
       chainId: 44787
     }
+  },
+  // Mutes the terminal warning
+  sourcify: {
+    enabled: false
+  },
+  etherscan: {
+    // V3 Native Mode: Just a single string
+    apiKey: API_KEY || "YOUR_ETHERSCAN_API_KEY"
   }
 };

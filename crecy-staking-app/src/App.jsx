@@ -135,8 +135,8 @@ const translations = {
 // ==========================================
 // CONFIGURATION VARIABLES (PASTE YOURS HERE)
 // ==========================================
-const PROJECT_ID = "YOUR_WALLETCONNECT_PROJECT_ID_HERE" || "1234";
-const STAKING_CONTRACT_ADDRESS = "YOUR_DEPLOYED_CONTRACT_ADDRESS_HERE";
+const PROJECT_ID = "166bde35e33389c5d9d28d9629c2ee62" || "1234";
+const STAKING_CONTRACT_ADDRESS = "0xCF1B48e2E7B4588b6673c4aB1855aFE71368e872";
 const CRECY_TOKEN_ADDRESS = "0x34C11A932853Ae24E845Ad4B633E3cEf91afE583";
 
 // Celo Network Configuration
